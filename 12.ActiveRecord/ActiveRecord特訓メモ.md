@@ -29,10 +29,12 @@ Salary.where(emp_no: 499999)
 ■問題  
 150000以上の給料をもらったことがある従業員の一覧を取得してください  
 
-■自己解答  
-①Employee.joins(:salaries).includes(:salaries).where('salary > 150000')  
-②Employee.joins(:salaries).eager_load(:salaries).where('salary > 150000')  
-③Employee.eager_load(:salaries).where('salary > ?', 150000)  
+■自分の解答  
+①Employee.joins(:salaries).includes(:salaries).where('salary >= 150000')  
+②Employee.joins(:salaries).eager_load(:salaries).where('salary >= 150000')  
+③Employee.eager_load(:salaries).where('salary >= ?', 150000)  
+④Employee.joins(:salaries).where('salary > ?', 150000).distinct  
+⑤Employee.joins(:salaries).where('salary > ?', 150000).group('emp_no')  
 
 ■解説  
 【間違えていた考え】  
@@ -44,3 +46,74 @@ Salary.where(emp_no: 499999)
 ①、②`join`を`inclides`と`eager_load`と合わせて使用すると内部結合だが、重複が削除されるため上手く表示されたっぽい。  
 [Rails における内部結合、外部結合まとめ](https://qiita.com/yuyasat/items/c2ad37b5a24a58ee3d30#1-actresses%E3%81%A8movies%E3%81%AE%E5%86%85%E9%83%A8%E7%B5%90%E5%90%88)  
 ③`eager_load`を使用して左外部結合で抽出。[ActiveRecord ～ 複数テーブルにまたがる検索（preload, eager_load, include, joins）](https://qiita.com/leon-joel/items/f26556c9e56833983856)  
+※ただこれはたまたま正解した模様。通常は外部結合での重複されるはず。
+
+### 問題4  
+■問題  
+150000以上の給料をもらったことがある女性従業員の一覧を取得してください  
+
+■自分の解答  
+①Employee.eager_load(:salaries).where('salary >= ?', 150000).where(gender: 'F')  
+②Employee.eager_load(:salaries).where("salary >= ? and gender = ?",150000,'F')  
+
+■解説  
+①whereをメソッドチェーンで繋ぐとand検索となる。  
+②1つのwhere内でプレースホルダを使用。`Employee.eager_load(:salaries).where("salary > ? and gender: 'F'",150000)`のように文字列での検索とハッシュの検索を混ぜて記載するとエラーとなった。(そういうもの？)  
+
+### 問題5  
+■問題  
+どんな肩書きがあるか一覧で取得してきてください  
+
+■自分の解答  
+①Title.select('title').distinct  
+②Title.distinct.select('title')
+
+■解説  
+`Title.select('title')`だけだと重複も抜かれてしまったため、`distinct`メソッドを追加した。  
+
+### 問題6  
+■問題  
+2000-1-29以降に肩書きが「Technique Leader」になった従業員を取得してください  
+
+■自分の解答  
+Employee.eager_load(:titles).where(titles: {title: 'Technique Leader'}).where('from_date >= ?', '2000-01-29')  
+
+■解説  
+`where(title: 'Technique Leader')`のように書くと`WHERE employees.title = 'Technique Leader'`のSQLが発行されてしまうので、関連先の条件を指定したい場合は`where(結合先のテーブル名: { カラム名: 値 })`の形式で書く必要がある。  
+`where('from_date >= ?', '2000-01-29')`の部分はシンボルでなく、文字列で検索を指定しているので上記対応は不要と思われる。  
+
+### 問題7  
+■問題  
+部署番号がd001である部署のマネージャー歴代一覧を取得してきてください  
+
+■自分の解答  
+Employee.joins(:dept_managers).where(dept_manager: {dept_no: 'd001'})  
+
+■解説  
+以下の考え方で実施。  
+employeesテーブルとdept_managerテーブルを内部結合を行い、dept_noがd001という条件を設定。  
+
+### 問題8  
+■問題  
+歴代マネージャーにおける男女比を出してください  
+
+■自分の解答  
+Employee.joins(:dept_managers).group(:gender).count  
+
+■解説  
+中間テーブルと内部結合をして、グループ化して集合関数(count)を使用する。  
+[【Rails】groupメソッドの使い方を図解形式で仕組みを徹底解説！](https://pikawaka.com/rails/group)  
+
+### 問題9  
+■問題  
+部署番号がd004の部署における1999-1-1時点のマネージャーを取得してください  
+
+■自分の解答  
+Employee.joins(:dept_managers).where(dept_manager: {dept_no: 'd004'}).where('to_date >= ?', '1999-1-1').order(:from_date).first
+
+■解説  
+①dept_managersと内部結合。  
+②dept_noがd004かつto_dateが1999-1-1以降に絞る。  
+③昇順に並べ替えた一番上のデータを取得する。
+
+※「'to_date >= ?', '1999-1-1'」の`to_date`の名前が他のテーブルカラム名と被った場合はどうするんだろう...
