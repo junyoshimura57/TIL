@@ -116,4 +116,43 @@ Employee.joins(:dept_managers).where(dept_manager: {dept_no: 'd004'}).where('to_
 ②dept_noがd004かつto_dateが1999-1-1以降に絞る。  
 ③昇順に並べ替えた一番上のデータを取得する。
 
-※「'to_date >= ?', '1999-1-1'」の`to_date`の名前が他のテーブルカラム名と被った場合はどうするんだろう...
+※「'to_date >= ?', '1999-1-1'」の`to_date`の名前が他のテーブルカラム名と被った場合はどうするんだろう...  
+→範囲オブジェクトを使えば大丈夫そう！[【Rails】範囲オブジェクト(Range)を使ったActiveRecordのwhere比較、範囲検索のコードの書き方](https://simple-minds-think-alike.hatenablog.com/entry/active-record-where-with-range)  
+
+### 問題10 
+■問題  
+従業員番号が10001, 10002, 10003の従業員が今までに稼いだ給料の合計を従業員ごとに集計してください  
+
+■自分の解答  
+Employee.joins(:salaries).where(emp_no: [10001,10002,10003]).group(:emp_no).sum(:salary)
+
+■解説  
+①`where(emp_no: [10001,10002,10003])`にてIN句を使用してemp_noを3つに絞る。  
+②emp_noでグループ化する。  
+③sumメソッドでグループごとにsalaryごとの合計をだす。  
+
+### 問題11 
+■問題  
+上記に加えtotal_salaryという仮のフィールドを作ってemployeeの情報とがっちゃんこしてください  
+
+■自分の解答  
+Employee.find_by_sql("SELECT `employees`.*, SUM(salary) AS total_salary FROM `employees` INNER JOIN `salaries` ON `salaries`.`emp_no` = `employees`.`emp_no` WHERE `employees`.`emp_no` IN (10001, 10002, 10003) GROUP BY `employees`.`emp_no`")  
+
+■解説  
+ActiveRecordを使用してだと、SELECT文に`SUM(salary) AS total_salary`としても`{10001=>1281612, 10002=>413127, 10003=>301212}`のようにハッシュが返って来てしまったため、find_by_sqlメソッドを使用して生SQLで記載。
+
+### 問題12 
+■問題  
+上記の結果を利用してコンソール上に以下のようなフォーマットでputsしてください。  
+
+■自分の解答  
+①employees = Employee.find_by_sql("SELECT `employees`.*, SUM(salary) AS total_salary FROM `employees` INNER JOIN `salaries` ON `salaries`.`emp_no` = `employees`.`emp_no` WHERE `employees`.`emp_no` IN (10001, 10002, 10003) GROUP BY `employees`.`emp_no`")  
+
+②employees.each do |employee|
+    p "emp_no: #{employee.emp_no}"
+    p "full_name: #{employee.first_name} #{employee.last_name}"
+    p "total_salary: #{employee.total_salary}"
+  end
+
+■解説  
+問題11の結果をeach文で展開をしてそれぞれputs。
